@@ -1,5 +1,7 @@
-git remote add origin https://github.com/longtian1911/code.git
+﻿git remote add origin https://github.com/longtian1911/code.git
 关联github仓库   origin 为自己给远程仓库的命名 可以修改
 
 git push -u origin master  将代码提交到git 中 最后一步
+
+git pull origin master  从远程仓库中下载最新代码
  
