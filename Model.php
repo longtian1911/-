@@ -31,6 +31,10 @@ class Model{
 		$this->prefix = $config['DB_PREFIX'];
 		//连接数据库
 		$this->link = $this->connect();
+        //得到数据表名 
+        $this->tableName = $this->getTableName();
+        //初始化options数组
+        $this->initOptions();
 	}
 
 	//连接数据库
@@ -45,13 +49,91 @@ class Model{
 		mysqli_set_charset($link,$this->charset);
 		return $link;
 	}
-	//filed方法
+
+    //得到数据库表明
+    protected function getTableName(){
+        //第一种，如果设置了成员变量，那么通过成员变量来得到表名
+        if (!empty($this->tableName)) {
+            //表前缀+表名
+            return $this->prefix.$this->tableName;
+        }
+        //第二种，如果没有设置成员变量，通过类名得到表名
+        //得到当前类的类名字符串 如 GoodsModel  UserModel
+        $className = get_class($this);
+        $table = strtolower(substr($className, 0, -5)); 
+        return $this->prefix.$table;
+
+    }
+
+    //初始化操作的数组
+    protected function initOptions(){
+        $arr = ['where', 'table', 'field', 'order', 'group', 'having', 'limit'];
+        //将options数组中这些键对应的值全部清空
+        foreach($arr as $value){
+            $this->options[$value] = '';
+            //将table默认设置为tableName
+            if($value == 'table'){
+                $this->options[$value] = $this->tableName;
+            }
+        }
+    }
+	//field方法
+    public function field($field){
+        if(!empty($field)){
+           if (is_string($field)) {
+               $this->options['field'] = $field;
+           }elseif (is_array($field)) {
+               $this->options['field'] = join(',', $field);
+           }
+        }
+        return $this;
+    }
 	//table方法
+    public function table($table){
+        if(!empty($table)){
+            $this->options['table'] = $table;
+        }
+        return $this;
+    }
 	//where方法
+    public function where($where){
+        if(!empty($where)){
+            $this->options['where'] = 'where ' . $where;
+        }
+        return $this;
+    }
 	//group方法
+    public function group($group){
+        if(!empty($group)){
+            $this->options['group'] = 'group by ' . $group;
+        }
+        return $this;
+    }
 	//having方法
+    public function having($having){
+        if(!empty($having)){
+            $this->options['having'] = 'having ' . $having;
+        }
+        return $this;
+    }
 	//order方法
+    public function order($order){
+        if(!empty($order)){
+            $this->options['order'] = 'order by ' . $order;
+        }
+        return $this;
+    }
 	//limit方法
+    public function order($limit){
+        if(!empty($limit)){
+            if (is_string($limit)) {
+                $this->options['limit'] = 'limit ' . $limit;
+            }elseif (is_array($limit)) {
+                $this->options['limit'] = 'limit ' .join(',', $limit);
+            }
+        }
+        return $this;
+    }
 	//select方法
 	//query方法
 	//exrc方法
