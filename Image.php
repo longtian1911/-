@@ -1,4 +1,9 @@
 <?php
+$image = new Image();
+//给图片添加水印
+//$image->water('1.png','2.png',1);
+//给图片等比缩放
+$image->suofang('1.png',200,200);
 class Image {
     //路径
     protected $path;
@@ -29,17 +34,61 @@ class Image {
             exit('水印图片太大');
         }
         //打开图片
+        $imageRes = self::openAayImage($image);
+        $waterRes = self::openAayImage($water);
         //根据水印图片的位置计算水印图片的坐标
+        $pos = $this->getPosition($postion,$imageInfo,$waterInfo);
         //将水印图片贴过来
+        imagecopymerge($imageRes, $waterRes, $pos['x'], $pos['y'], 0, 0, $waterInfo['width'], $waterInfo['height'], $tmd);
         //得到要保存图片的文件名
+        $newName = $this->createNewName($image, $prefix);
         //得到保存图片的路径
+        $newPath = rtrim($this->path, '/').'/'.$newName;
         //保存图片
+        $this->saveImage($imageRes,$newPath);
         //销毁资源
+        imagedestroy($imageRes);
+        imagedestroy($waterRes);
+        return $newPath;
     }
 
     //对外公开的缩放方法
-    public function suofang(){
+    //$image:需要缩放的图片   $width:缩放后的宽度 $height:缩放后的高度 $prefix:缩放后图片前缀
+    public function suofang($image,$width,$height,$prefix = 'sf_'){
+    	//得到图片原来的宽度和高度
+    	$info = self::getImageInfo($image);
+    	//根据图片原来的宽高和最终要缩放的宽高计算得到图像不变形的宽高
+    	$size = $this->getNewSize($width, $height, $info);
+    	//打开图片资源
+    	$imageRes = self::openAayImage($image);
+    	//进行缩放
+    	$newRes = $this->kidOfImage($imageRes, $size, $info);
+    	//保存图片
+    	$newName = $this->createNewName($image, $prefix);
+    	$newPath = rtrim($this->path, '/').'/'.$newName;
+    	$this->saveImage($newRes, $newPath);
+    	//销毁图像资源
+    	imagedestroy($imageRes);
+    	imagedestroy($newRes);
+    	
+    }
 
+    //保存图片资源函数
+    protected function saveImage($imageRes,$newPath){
+    	//使用哪种格式保存如 imagepng    imagegif
+    	$func= 'image'.$this->type;
+    	//通过变量函数进行保存
+    	$func($imageRes,$newPath);
+    }
+
+    //得到文件名函数
+    protected function createNewName($imagePath, $prefix){
+    	if ($this->isRandName) {
+    		$name = $prefix.uniqid().'.'.$this->type;
+    	}else{
+    		$name = $prefix.pathinfo($imagePath)['filename'].'.'.$this->type;
+    	}
+    	return $name;
     }
 
     //静态方法,根据图片的路径得到图片的信息,宽度 高度 mime类型
@@ -52,6 +101,52 @@ class Image {
         return $data;
     }
 
+    //根据位置计算谁有图片的坐标
+    protected function getPosition($postion,$imageInfo,$waterInfo){
+    	switch ($postion) {
+    		case 1:
+    			$x = 0;
+    			$y = 0;
+    			break;
+    		case 2:
+    			$x = ($imageInfo['width'] - $waterInfo['width']) / 2;
+    			$y = 0;
+    			break;
+    		case 3:
+    			$x = $imageInfo['width'] - $waterInfo['width'];
+    			$y = 0;
+    			break;
+    		case 4:
+    			$x = 0;
+    			$y = ($imageInfo['height'] - $waterInfo['height']) / 2;
+    			break;
+    		case 5:
+    			$x = ($imageInfo['width'] - $waterInfo['width']) / 2;
+    			$y = ($imageInfo['height'] - $waterInfo['height']) / 2;
+    			break;
+    		case 6:
+    			$x = $imageInfo['width'] - $waterInfo['width'];
+    			$y = ($imageInfo['height'] - $waterInfo['height']) / 2;
+    			break;
+    		case 7:
+    			$x = 0;
+    			$y = $imageInfo['height'] - $waterInfo['height'];
+    			break;
+    		case 8:
+    			$x = ($imageInfo['width'] - $waterInfo['width']) / 2;
+    			$y = $imageInfo['height'] - $waterInfo['height'];
+    			break;
+    		case 9:
+    			$x = $imageInfo['width'] - $waterInfo['width'];
+    			$y = $imageInfo['height'] - $waterInfo['height'];
+    			break;
+    		case 0:
+    			$x = mt_rand(0,($imageInfo['width'] - $waterInfo['width']));
+    			$y =  mt_rand(0,($imageInfo['height'] - $waterInfo['height']));
+    			break;
+    	}
+    	return ['x' => $x, 'y' => $y];
+    }
     //判断水印图片是否大于原图片
     protected function checkImage($imageInfo, $waterInfo){
         if(($waterInfo['width'] > $imageInfo['width']) || ($waterInfo['height'] > $imageInfo['height'])){
@@ -81,5 +176,46 @@ class Image {
         }
         return $image;
     }
+
+    //处理透明色函数
+    protected function kidOfImage($srcImg, $size, $imgInfo){
+    	//传入新的尺寸,穿件一个指定尺寸的图片
+    	$newImg = imagecreatetruecolor($size['old_w'], $size['old_h']);
+    	//定义透明色
+    	$otsc = imagecolortransparent($srcImg);
+    	if ($otsc >=0) {
+    		//取得透明色
+    		$transparentcolor = imagecolorsforindex($srcImg, $otsc);
+    		//创建透明色
+    		$newtransparentcolor = imagecolorallocate($newImg, $transparentcolor['red'], $transparentcolor['green'],$transparentcolor['blue']);
+    	}else{
+    		//将黑色作为透明色,因为创建图像后再第一次分配颜色时背景默认为黑色
+    		$newtransparentcolor = imagecolorallocate($newImg, 0, 0, 0);
+    	}
+    	//背景填充透明
+    	imagefill($newImg, 0, 0, $newtransparentcolor);
+    	imagecolortransparent($newImg,$newtransparentcolor);
+    	imagecopyresampled($newImg, $srcImg, $size['x'], $size['y'], 0,0, $size['new_w'], $size['new_h'], $imgInfo['width'],  $imgInfo['height']);
+    	return $newImg;
+    }
+
+    //计算宽度和高度 $width:最终缩放的宽度  $height:最终缩放的高度 $imgInfo:原始图片的宽度和高度
+    protected function getNewSize($width, $height, $imgInfo){
+    	$size['old_w'] = $width;
+    	$size['old_h'] = $height;
+    	$scaleWidth = $width / $imgInfo['width'];
+    	$scaleHeight = $height / $imgInfo['height'];
+    	$scaleFinal = min($scaleWidth, $scaleHeight);
+    	$size['new_w'] = round($imgInfo['width'] * $scaleFinal);
+    	$size['new_h'] = round($imgInfo['height'] * $scaleFinal);
+    	if ($scaleWidth < $scaleHeight) {
+    		$size['x'] = 0;
+    		$size['y'] = round(abs($size['new_h'] - $height) / 2);
+    	}else{
+    		$size['y'] = 0;
+    		$size['x'] = round(abs($size['new_w'] - $width) / 2);
+    	}
+    	return $size;
+    }
+
 }
-$image = new Image();
