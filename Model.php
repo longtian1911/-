@@ -1,4 +1,21 @@
-<?php 
+<?php
+$config = ['DB_HOST'=>'localhost', 'DB_USER'=>'root','DB_PWD'=>'123456','DB_NAME'=>'tt','DB_CHARSET'=> 'utf8','DB_PREFIX'=>''];
+$m = new Model($config);
+/*$m->limit('0,5')->table('user')->field('age,name')->order('money desc')->where('id>=0')->select();
+
+//查询操作
+var_dump($m->limit('0,5')->table('user')->field('age,name')->order('money desc')->where('id>=1')->select());*/
+
+//删除操作
+/*$data = ['age' =>30, 'name'=>'成龙', 'money'=> 2000];
+echo $m->table('user')->insert($data);*/
+/*var_dump($m->table('user')->where('id>=3')->delete());*/
+
+//更新操作
+/*$data =['name'=>'成龙', 'money'=>3000];
+var_dump($m->table('user')->where('id=2')->update($data));*/
+var_dump($m->table('user')->max('money'));
+
 class Model{
 	//主机名
 	protected $host;
@@ -124,7 +141,7 @@ class Model{
         return $this;
     }
 	//limit方法
-    public function order($limit){
+    public function limit($limit){
         if(!empty($limit)){
             if (is_string($limit)) {
                 $this->options['limit'] = 'limit ' . $limit;
@@ -135,6 +152,137 @@ class Model{
         return $this;
     }
 	//select方法
+	function select(){
+		//先预写一个带有占位符的sql语句
+		$sql = 'select %FIELD% from %TABLE% %WHERE% %GROUP% %HAVING% %ORDER% %LIMIT%';
+		//将options中对于的值依次的替换上面的占位符
+		$sql = str_replace(['%FIELD%','%TABLE%','%WHERE%','%GROUP%','%HAVING%','%ORDER%','%LIMIT%'], [$this->options['field'], $this->options['table'],$this->options['where'],$this->options['group'],$this->options['having'],$this->options['order'],$this->options['limit']], $sql);
+		//保存一份sql语句
+		$this->sql = $sql;
+		//执行sql语句
+		return $this->query($sql);
+	}
+
 	//query方法
-	//exrc方法
+	public function query($sql){
+		//清空options数组中的数据
+		$this->initOptions();
+		//执行sql语句
+		$result = mysqli_query($this->link, $sql);
+		//提取结果集存放在数组中
+		if ($result && mysqli_affected_rows($this->link)) {
+			while ($data = mysqli_fetch_assoc($result)) {
+				$newData[] = $data;
+			}
+		}
+		//返回结果集
+		return $newData;
+	}
+
+	//exec方法
+	public function exec($sql, $isInsert = false){
+		//清空options数组中的数据
+		$this->initOptions();
+		//执行sql语句
+		$result = mysqli_query($this->link, $sql);
+		if ($result && mysqli_affected_rows($this->link)) {
+			//判断是否是插入语句，根据不同的语句返回不同的结果
+			if ($isInsert) {
+				return mysqli_insert_id($this->link);
+			}else{
+				return mysqli_affected_rows($this->link);
+			}
+		}
+		return false;
+	}
+
+	//执行sql语句
+	public function __get($name){
+		if($name == 'sql'){
+			return $this->sql;
+		}
+		return false;
+	}
+
+	//insert函数
+	//$data:关联数组  键就是字段名，值就是字段值
+	public function insert($data){
+		//处理字符串问题，两边需要添加单、双引号
+		$data = $this->parseValue($data);
+		//提取所有的键 ，即所有的字段
+		$keys = array_keys($data);
+		//提取所有的值
+		$values = array_values($data);
+		//增加数据的sql语句
+		$sql = 'insert into %TABLE%(%FIELD%) values(%VALUES%)';
+		$sql = str_replace(['%TABLE%', '%FIELD%', '%VALUES%'], [$this->options['table'], join(',', $keys), join(',', $values)], $sql);
+		$this->sql = $sql;
+		return $this->exec($sql, true);
+	}
+
+	//传递进来一个数组，将数组中值为字符串的两边加上引号
+	//insert into table(字段) value(值)
+	protected function parseValue($data){
+		//遍历数组，判断是否为字符串，若是字符串，将其两边添加引号
+		foreach ($data as $key => $value) {
+			if (is_string($value)) {
+				$value ='"'.$value.'"';
+			}
+			$newData[$key] = $value;
+		}
+		//返回处理后的数组
+		return $newData;
+	}
+
+	//删除函数
+	public function delete(){
+		//拼接sql语句
+		$sql = 'delete from %TABLE% %WHERE%';
+		$sql = str_replace(['%TABLE%', '%WHERE%'], [$this->options['table'], $this->options['where']], $sql);
+		//保存sql语句
+		$this->sql = $sql;
+		//执行sql 语句
+		return $this->exec($sql);
+	}
+
+	//更新函数
+	//update 表名  set 字段名=字段值，字段名=字段值 where
+	public function update($data){
+		//处理data数组中值为字符串加引号的问题
+		$data = $this->parseValue($data);
+		//将关联数组凭借为固定的格式 键=值，键=值
+		$value = $this->parseUpdate($data);
+		//准备sql语句
+		$sql = 'update %TABLE% set %VALUE% %WHERE%';
+		$sql = str_replace(['%TABLE%', '%VALUE%', '%WHERE%'], [$this->options['table'], $value, $this->options['where']], $sql);
+		//保存sql语句
+		$this->sql = $sql;
+		//执行sql语句
+		return $this->exec($sql);
+	}
+
+	protected function parseUpdate($data){
+		foreach ($data as $key => $value) {
+			$newData[] =$key . '=' .$value;
+		}
+		return join(',', $newData);
+	}
+
+	//max函数
+	public function max($field){
+		//通过调用自己封装的方法进行查询
+		$result = $this->field('max(' .$field. ') as max')->select();
+		//select方法返回的是一个二维数组
+		return $result[0]['max'];
+	}
+
+	//析构方法
+	public function __destruct(){
+		mysqli_close($this->link);
+	}
+
+	//getByName getByAge
+	function __call($name, $args){
+		
+	}
 }
