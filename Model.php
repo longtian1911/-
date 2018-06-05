@@ -14,7 +14,9 @@ echo $m->table('user')->insert($data);*/
 //更新操作
 /*$data =['name'=>'成龙', 'money'=>3000];
 var_dump($m->table('user')->where('id=2')->update($data));*/
-var_dump($m->table('user')->max('money'));
+// var_dump($m->table('user')->max('money'));
+
+var_dump($m->table('user')->getByName('成龙'));
 
 class Model{
 	//主机名
@@ -91,6 +93,8 @@ class Model{
             //将table默认设置为tableName
             if($value == 'table'){
                 $this->options[$value] = $this->tableName;
+            }elseif ($value == 'field') {
+                $this->options[$value] = '*';
             }
         }
     }
@@ -286,6 +290,11 @@ class Model{
 		//获取前五个字符
 		$str = substr($name, 0, 5);
 		//获取后面的字段名
-		$field = substr($name, 5);
+		$field = strtolower(substr($name, 5));
+        //判断前五个字符是否是getby
+        if ($str == 'getBy') {
+            return $this->where($field. '="' . $args[0].'"')->select();
+        }
+        return false;
 	}
 }
