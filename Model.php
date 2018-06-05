@@ -283,6 +283,9 @@ class Model{
 
 	//getByName getByAge
 	function __call($name, $args){
-		
+		//获取前五个字符
+		$str = substr($name, 0, 5);
+		//获取后面的字段名
+		$field = substr($name, 5);
 	}
 }
