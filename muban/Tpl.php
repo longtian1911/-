@@ -65,12 +65,12 @@ clss Tpl{
         $cachePath = rtrim($this->cacheDir, '/').'/'.$cacheName;
         //根据缓存文件全路径，判断缓存文件是否存在
         if(!file_exists($cachePath)){
+            //如果缓存文件不存在，编译模板文件，生成缓存文件
             //编译模板文件
             $php = $this->compile($viewPath);
             //写入文件，生成缓存文件
             file_put_contents($cachePath,$php);
         }else{
-            //如果缓存文件不存在，编译模板文件，生成缓存文件
             //如果缓存文件存在，第一个，判断缓存文件是否过期；第二个判断模板文件是否被修改过，如果模板文件被修改过缓存文件需要重新生成
             $isTimeout = (filectime($cachePath) + $this->lifeTime) > time() ? false : true;
             $isChange = filemtime($viewPath) > filemtime($cachePath) ? true : false;
@@ -80,6 +80,53 @@ clss Tpl{
                 file_put_contents($cachePath,$php);
             }
         }
-            //判断缓存文件是否需要包含进来
+        //判断缓存文件是否需要包含进来
+        if ($isInclude) {
+            //将变量解析出来
+            extract($this->vars);
+            //展示缓存文件
+            include $cachePath;
+        }
+    }
+
+    //compile方法，编译html文件
+    protected function compile($filePath){
+        //读取文件内容
+        $html = file_get_contents($filePath);
+        //正则替换
+        $array = [
+            '{$%%}' => '<?=$\1; ?>',
+            '{foreach %%}' => '<?php foreach(\1): ?>',
+            '{/foreach}' => '<?php endforeach ?>',
+            '{include %%}' => '',
+            '{if %%}' => '<?php if(\1): ?>',
+        ];
+        //遍历数组，将%%全部修改为.+ 然后执行正则替换
+        foreach ($array as $key => $value) {
+           //生成正则表达式
+            $pattern = '#'.str_replace('%%', '(.+?)', preg_quote($key,'#')).'#';
+            //实现正则替换
+            if (strstr($pattern, 'include')) {
+                $html = preg_replace_callback($pattern, [$this,'parseInclude'], $html);
+            }else{
+                //执行替换
+                $html = preg_replace($pattern, $value, $html);
+            }
+        }
+        //返回替换后的内容
+        return $html;
+    }
+
+
+    //处理include正则表达式，$data就是匹配到的内容
+    protected function parseInclude($data){
+        //将文件名两边的引号去除掉
+        $fileName = trim($data[1],'\'"');
+        //然后不包含文件生成缓存
+        $this->display($fileName.false);
+        //拼接缓存文件全路径
+        $cacheName = md5($fileName).php;
+        $cachePath = rtrim($this->cacheDir, '/').'/'.$cacheName;
+        return '<?php include "'.$cachePath.'"?>';
     }
 }
