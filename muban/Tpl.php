@@ -1,4 +1,5 @@
 <?php
+//模板引擎类
 class Tpl{
     //模板文件路径
     protected $viewDir = './view/';
