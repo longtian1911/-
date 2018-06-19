@@ -1,5 +1,5 @@
 <?php
-clss Tpl{
+class Tpl{
     //模板文件路径
     protected $viewDir = './view/';
     //生成的缓存文件路径
@@ -123,10 +123,10 @@ clss Tpl{
         //将文件名两边的引号去除掉
         $fileName = trim($data[1],'\'"');
         //然后不包含文件生成缓存
-        $this->display($fileName.false);
+        $this->display($fileName, false);
         //拼接缓存文件全路径
-        $cacheName = md5($fileName).php;
+        $cacheName = md5($fileName).'.php';
         $cachePath = rtrim($this->cacheDir, '/').'/'.$cacheName;
-        return '<?php include "'.$cachePath.'"?>';
+        return '<?php include "'.$cachePath.'" ?>';
     }
 }
